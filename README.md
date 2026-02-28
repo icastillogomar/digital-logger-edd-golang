@@ -2,7 +2,7 @@
 
 SDK de logging para servicios Go con soporte para PostgreSQL (desarrollo) y Google Cloud PubSub (producción).
 
-## Instalación
+## Instalación.
 
 ```bash
 go get github.com/icastillogomar/digital-logger-edd-golang
