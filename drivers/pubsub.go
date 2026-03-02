@@ -57,7 +57,7 @@ func (d *PubSubDriver) ensureClient() error {
 
 	d.client = client
 	d.topic = client.Topic(d.topicName)
-	fmt.Printf("[digital-edd-logger] PubSub conectado al topic: %s\n", d.topicName)
+	fmt.Printf("[digital-edd-logger] Pub/Sub conectado al topic: %s\n", d.topicName)
 	return nil
 }
 

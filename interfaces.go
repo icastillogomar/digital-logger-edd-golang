@@ -13,16 +13,16 @@ const (
 )
 
 type RequestInfo struct {
-	Method  string                 `json:"method"`
-	Path    string                 `json:"path"`
-	Headers map[string]string      `json:"headers,omitempty"`
-	Body    interface{}            `json:"body,omitempty"`
+	Method  string            `json:"method"`
+	Path    string            `json:"path"`
+	Headers map[string]string `json:"headers"`
+	Body    interface{}       `json:"body,omitempty"`
 }
 
 type ResponseInfo struct {
-	StatusCode int                    `json:"statusCode"`
-	Headers    map[string]string      `json:"headers,omitempty"`
-	Body       interface{}            `json:"body,omitempty"`
+	StatusCode int               `json:"statusCode"`
+	Headers    map[string]string `json:"headers"`
+	Body       interface{}       `json:"body,omitempty"`
 }
 
 type TraceLog struct {
