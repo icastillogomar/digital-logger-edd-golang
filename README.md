@@ -1,4 +1,4 @@
-# Digital EDD Logger (Go)
+# Digital EDD Logger (GO)
 
 SDK de logging para servicios Go con soporte para PostgreSQL (desarrollo) y Google Cloud PubSub (producción).
 
@@ -53,10 +53,10 @@ GOOGLE_CLOUD_PROJECT=my-project-id
 
 ## Comportamiento
 
-| ENV | Driver | Destino |
-|-----|--------|---------|
-| `local` (o vacío) | PostgreSQL | Tabla `LGS_EDD_SDK_HIS` |
-| `prod`, `production`, `qa`, `qas` | PubSub | Topic `digital-edd-sdk` |
+| ENV                               | Driver     | Destino                 |
+|-----------------------------------|------------|-------------------------|
+| `local` (o vacío)                 | PostgreSQL | Tabla `LGS_EDD_SDK_HIS` |
+| `prod`, `production`, `qa`, `qas` | PubSub     | Topic `digital-edd-sdk` |
 
 Si falta configuración, usa `ConsoleDriver` como fallback.
 
@@ -85,10 +85,10 @@ type LogOptions struct {
 
 ## Variables de Entorno
 
-| Variable | Descripción | Requerido |
-|----------|-------------|-----------|
-| `DB_URL` | URL de PostgreSQL | Solo en local |
-| `ENV` | `local` para forzar PostgreSQL | Opcional |
-| `GOOGLE_CLOUD_PROJECT` | Project ID de GCP | Solo en prod |
-| `SDKTRACKING_PUBLISH` | `false` para deshabilitar | Opcional |
-| `PUBSUB_TOPIC_NAME` | Nombre del topic | Opcional (default: `digital-edd-sdk`) |
+| Variable               | Descripción                    | Requerido                             |
+|------------------------|--------------------------------|---------------------------------------|
+| `DB_URL`               | URL de PostgreSQL              | Solo en local                         |
+| `ENV`                  | `local` para forzar PostgreSQL | Opcional                              |
+| `GOOGLE_CLOUD_PROJECT` | Project ID de GCP              | Solo en prod                          |
+| `SDKTRACKING_PUBLISH`  | `false` para deshabilitar      | Opcional                              |
+| `PUBSUB_TOPIC_NAME`    | Nombre del topic               | Opcional (default: `digital-edd-sdk`) |
