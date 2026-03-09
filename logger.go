@@ -272,6 +272,7 @@ func (l *EddLogger) SendTraceByInput(opts *TraceInputOptions) (string, error) {
 	}
 
 	trace := &TraceByInput{
+		TypeStream:       "inputStream",
 		RequestID:        opts.RequestID,
 		RequestType:      opts.RequestType,
 		Endpoint:         opts.Endpoint,
@@ -349,6 +350,7 @@ func (l *EddLogger) SendTraceByOutput(opts *TraceOutputOptions) (string, error) 
 	}
 
 	trace := &TraceByOutput{
+		TypeStream:          "outputStream",
 		RequestID:           opts.RequestID,
 		RequestType:         opts.RequestType,
 		Endpoint:            opts.Endpoint,
@@ -423,6 +425,7 @@ func (l *EddLogger) SendTraceByLog(opts *TraceLogOptions) (string, error) {
 	}
 
 	trace := &TraceByLog{
+		TypeStream:     "logsStream",
 		LogID:          opts.LogID,
 		RequestID:      opts.RequestID,
 		RequestType:    opts.RequestType,

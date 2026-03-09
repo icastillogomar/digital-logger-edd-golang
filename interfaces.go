@@ -58,6 +58,7 @@ type RecalculateLine struct {
 }
 
 type TraceByInput struct {
+	TypeStream       string           `json:"typeStream"`
 	RequestID        string           `json:"requestId"`
 	RequestType      string           `json:"requestType"`
 	Endpoint         string           `json:"endpoint"`
@@ -128,6 +129,7 @@ type EddCalculated struct {
 }
 
 type TraceByOutput struct {
+	TypeStream          string            `json:"typeStream"`
 	RequestID           string            `json:"requestId"`
 	RequestType         string            `json:"requestType"`
 	Endpoint            string            `json:"endpoint"`
@@ -160,6 +162,7 @@ type LogResponsePayload struct {
 }
 
 type TraceByLog struct {
+	TypeStream     string              `json:"typeStream"`
 	LogID          string              `json:"logId"`
 	RequestID      string              `json:"requestId"`
 	RequestType    string              `json:"requestType"`
