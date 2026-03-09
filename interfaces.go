@@ -57,7 +57,7 @@ type RecalculateLine struct {
 	CarrierRejected  *string `json:"carrierRejected,omitempty"`
 }
 
-type SchemaInput struct {
+type TraceByInput struct {
 	RequestID        string           `json:"requestId"`
 	RequestType      string           `json:"requestType"`
 	Endpoint         string           `json:"endpoint"`
@@ -127,7 +127,7 @@ type EddCalculated struct {
 	Routes  []EddCalculatedRoute   `json:"routes"`
 }
 
-type SchemaOutput struct {
+type TraceByOutput struct {
 	RequestID           string            `json:"requestId"`
 	RequestType         string            `json:"requestType"`
 	Endpoint            string            `json:"endpoint"`
@@ -159,7 +159,7 @@ type LogResponsePayload struct {
 	Body       interface{} `json:"body,omitempty"`
 }
 
-type SchemaLog struct {
+type TraceByLog struct {
 	LogID          string              `json:"logId"`
 	RequestID      string              `json:"requestId"`
 	RequestType    string              `json:"requestType"`
