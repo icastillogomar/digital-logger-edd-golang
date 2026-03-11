@@ -18,28 +18,34 @@ type PostgresDriver struct {
 }
 
 const (
-	tableName = "LGS_EDD_SDK_HIS"
+	tableName = "LGS_EDD_IA_LOGS_HIS"
 	ddl       = `
-	CREATE TABLE IF NOT EXISTS LGS_EDD_SDK_HIS (
+	CREATE TABLE IF NOT EXISTS LGS_EDD_IA_LOGS_HIS (
 		id SERIAL PRIMARY KEY,
-		traceId VARCHAR(255) NOT NULL,
-		timeLocal TIMESTAMP NOT NULL,
-		timeUTC TIMESTAMP NOT NULL,
-		service VARCHAR(255) NOT NULL,
-		level VARCHAR(50) NOT NULL,
-		"user" VARCHAR(255),
-		action VARCHAR(255),
-		context VARCHAR(255),
-		request JSONB,
-		response JSONB,
-		durationMs FLOAT,
+		logId VARCHAR(255),
+		requestId VARCHAR(255),
+		requestType VARCHAR(255),
+		endpoint TEXT,
+		logAt TIMESTAMP NOT NULL,
+		level VARCHAR(50),
+		context TEXT,
+		message TEXT,
+		step VARCHAR(255),
+		durationMs DOUBLE PRECISION,
+		idTxn VARCHAR(255),
 		tags TEXT,
-		messageInfo TEXT,
-		messageRaw TEXT,
-		flagSummary INTEGER NOT NULL DEFAULT 0
+		additionalData JSONB,
+		extra JSONB,
+		stacktrace TEXT,
+		ingestedAt TIMESTAMP NOT NULL,
+		serviceName VARCHAR(255),
+		requestMethod VARCHAR(50),
+		requestBody JSONB,
+		responseStatusCode INTEGER,
+		responseBody JSONB
 	);
-	CREATE INDEX IF NOT EXISTS idx_lgs_edd_sdk_his_trace_id ON LGS_EDD_SDK_HIS(traceId);
-	CREATE INDEX IF NOT EXISTS idx_lgs_edd_sdk_his_time_utc ON LGS_EDD_SDK_HIS(timeUTC);
+	CREATE INDEX IF NOT EXISTS idx_lgs_edd_ia_logs_his_request_id ON LGS_EDD_IA_LOGS_HIS(requestId);
+	CREATE INDEX IF NOT EXISTS idx_lgs_edd_ia_logs_his_log_at ON LGS_EDD_IA_LOGS_HIS(logAt);
 	`
 )
 
@@ -87,53 +93,62 @@ func (d *PostgresDriver) Send(record map[string]interface{}) (string, error) {
 	}
 
 	sqlQuery := `
-		INSERT INTO LGS_EDD_SDK_HIS 
-			(traceId, timeLocal, timeUTC, service, level, "user", action, context, 
-			 request, response, durationMs, tags, messageInfo, messageRaw, flagSummary)
+		INSERT INTO LGS_EDD_IA_LOGS_HIS
+			(logId, requestId, requestType, endpoint, logAt, level, context, message,
+			 step, durationMs, idTxn, tags, additionalData, extra, stacktrace, ingestedAt,
+			 serviceName, requestMethod, requestBody, responseStatusCode, responseBody)
 		VALUES 
-			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 		RETURNING id
 	`
 
-	now := time.Now()
-	nowUTC := time.Now().UTC()
+	requestMap, _ := record["request"].(map[string]interface{})
+	responseMap, _ := record["response"].(map[string]interface{})
 
-	var requestJSON, responseJSON *string
-	if req, ok := record["request"]; ok && req != nil {
-		data, _ := json.Marshal(req)
-		str := string(data)
-		requestJSON = &str
+	requestMethod, _ := requestMap["method"].(string)
+	requestBodyJSON := marshalNullableJSON(requestMap["body"])
+	responseStatusCode := toNullableInt(responseMap["statusCode"])
+	responseBodyJSON := marshalNullableJSON(responseMap["body"])
+
+	logAt, err := parseTimestampWithDefault(record["logAt"])
+	if err != nil {
+		return "", fmt.Errorf("invalid logAt: %w", err)
 	}
-	if resp, ok := record["response"]; ok && resp != nil {
-		data, _ := json.Marshal(resp)
-		str := string(data)
-		responseJSON = &str
+	ingestedAt, err := parseTimestampWithDefault(record["ingestedAt"])
+	if err != nil {
+		return "", fmt.Errorf("invalid ingestedAt: %w", err)
 	}
 
 	var tagsStr *string
-	if tags, ok := record["tags"].([]string); ok && len(tags) > 0 {
+	if tags := normalizeTags(record["tags"]); len(tags) > 0 {
 		str := strings.Join(tags, ",")
 		tagsStr = &str
 	}
 
 	var rowID int
-	err := d.conn.QueryRow(
+	err = d.conn.QueryRow(
 		sqlQuery,
-		record["traceId"],
-		now,
-		nowUTC,
-		record["service"],
+		record["logId"],
+		record["requestId"],
+		record["requestType"],
+		record["endpoint"],
+		logAt,
 		record["level"],
-		record["user"],
-		record["action"],
 		record["context"],
-		requestJSON,
-		responseJSON,
+		record["message"],
+		record["step"],
 		record["durationMs"],
+		record["idTxn"],
 		tagsStr,
-		record["messageInfo"],
-		record["messageRaw"],
-		0,
+		marshalNullableJSON(record["additionalData"]),
+		marshalNullableJSON(record["extra"]),
+		record["stacktrace"],
+		ingestedAt,
+		record["serviceName"],
+		nullableString(requestMethod),
+		requestBodyJSON,
+		responseStatusCode,
+		responseBodyJSON,
 	).Scan(&rowID)
 
 	if err != nil {
@@ -142,9 +157,95 @@ func (d *PostgresDriver) Send(record map[string]interface{}) (string, error) {
 	return fmt.Sprintf("%d", rowID), nil
 }
 
+func marshalNullableJSON(value interface{}) *string {
+	if value == nil {
+		return nil
+	}
+
+	data, err := json.Marshal(value)
+	if err != nil || string(data) == "null" {
+		return nil
+	}
+
+	str := string(data)
+	return &str
+}
+
+func normalizeTags(value interface{}) []string {
+	switch tags := value.(type) {
+	case []string:
+		return tags
+	case []interface{}:
+		result := make([]string, 0, len(tags))
+		for _, tag := range tags {
+			if str, ok := tag.(string); ok && str != "" {
+				result = append(result, str)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+func toNullableInt(value interface{}) interface{} {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case int:
+		return v
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	default:
+		return nil
+	}
+}
+
+func nullableString(value string) interface{} {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
 func (d *PostgresDriver) Close() error {
 	if d.conn != nil {
 		return d.conn.Close()
 	}
 	return nil
+}
+
+func parseTimestampWithDefault(value interface{}) (time.Time, error) {
+	now := time.Now()
+
+	switch v := value.(type) {
+	case nil:
+		return now, nil
+	case time.Time:
+		if v.IsZero() {
+			return now, nil
+		}
+		return v, nil
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return now, nil
+		}
+		for _, layout := range []string{
+			time.RFC3339Nano,
+			time.RFC3339,
+			"2006-01-02 15:04:05",
+			"2006-01-02 15:04:05.999999",
+		} {
+			if parsed, err := time.Parse(layout, v); err == nil {
+				return parsed, nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("unsupported timestamp format %q", v)
+	default:
+		return time.Time{}, fmt.Errorf("unsupported timestamp type %T", value)
+	}
 }
