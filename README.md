@@ -18,19 +18,35 @@ import (
 )
 
 func main() {
-    log := eddlogger.NewLogger("my-service")
-    defer log.Close()
-    
-    log.Log(&eddlogger.LogOptions{
-        TraceID:      "abc-123",
-        Action:       "ORDER_CREATED",
-        Context:      "OrderService",
-        Method:       "POST",
-        Path:         "/api/orders",
-        RequestBody:  map[string]interface{}{"product": "ABC", "qty": 2},
-        StatusCode:   200,
-        ResponseBody: map[string]interface{}{"order_id": "12345"},
-        DurationMs:   150.5,
+	traceLogger := eddlogger.NewLogger("my-service")
+    defer traceLogger.Close()
+
+	traceLogger.SendTraceByLog(&eddlogger.TraceLogOptions{
+		LogID:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		RequestID:   "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		RequestType: "HTTP",
+		Endpoint:    "/edd/fee2/facade/pdp",
+		LogAt:       "2026-03-10 11:24:37.079000 UTC",
+		Level:       "INFO",
+		Context:     "middleware.request_response",
+		Message:     "HTTP request/response trace",
+		Step:        "RequestResponseLogger",
+		IDTxn:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		Tags:        []string{"http", "middleware", "request-response"},
+		AdditionalData: map[string]interface{}{
+			"path":  "/edd/fee2/facade/pdp",
+			"query": "quantity=1&skuId=1001330922&productType=Soft%20Line&postalCode=01040",
+		},
+		Extra: map[string]interface{}{
+			"clientIp":  "201.116.168.4",
+			"userAgent": "PostmanRuntime/7.52.0",
+		},
+		IngestedAt:         "2026-03-10 11:24:37.079000 UTC",
+		ServiceName:        "my-service",
+		RequestMethod:      "GET",
+		RequestBody:        map[string]interface{}{},
+		ResponseStatusCode: 200,
+		ResponseBody:       map[string]interface{}{"success":true},
     })
 }
 ```
@@ -63,23 +79,28 @@ Si falta configuración, usa `ConsoleDriver` como fallback.
 ## API
 
 ```go
-type LogOptions struct {
-    TraceID         string
-    Level           string                 // DEBUG, INFO, WARNING, ERROR, CRITICAL
-    Action          string
-    Context         string
-    Method          string
-    Path            string
-    RequestHeaders  map[string]string
-    RequestBody     interface{}
-    StatusCode      int
-    ResponseHeaders map[string]string
-    ResponseBody    interface{}
-    DurationMs      float64
-    MessageInfo     string
-    MessageRaw      string
-    Tags            []string
-    Service         string
+type TraceLogOptions struct {
+    LogID              string
+    RequestID          string
+    RequestType        string
+    Endpoint           string
+    LogAt              string
+    Level              string    // DEBUG, INFO, WARNING, ERROR, CRITICAL
+    Context            string
+    Message            string
+    Step               string
+    DurationMs         *float64
+    IDTxn              string
+    Tags               []string
+    AdditionalData     interface{}
+    Extra              interface{}
+    Stacktrace         string
+    IngestedAt         string
+    ServiceName        string
+    RequestMethod      string
+    RequestBody        interface{}
+    ResponseStatusCode int
+    ResponseBody       interface{}
 }
 ```
 
