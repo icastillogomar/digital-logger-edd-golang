@@ -37,10 +37,10 @@ func TestLogWithMockDriver(t *testing.T) {
 	mockDriver := NewMockDriver()
 	log.SetDriver(mockDriver)
 
-	id, err := log.Log(&LogOptions{
-		TraceID: "test-trace-001",
-		Action:  "TEST_ACTION",
-		Context: "TestContext",
+	id, err := log.SendTraceByLog(&TraceLogOptions{
+		LogID:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		RequestType: "HTTP",
+		Context:     "TestContext",
 	})
 
 	if err != nil {
@@ -56,11 +56,11 @@ func TestLogWithMockDriver(t *testing.T) {
 	}
 
 	record := mockDriver.records[0]
-	if record["traceId"] != "test-trace-001" {
-		t.Errorf("Expected traceId 'test-trace-001', got '%v'", record["traceId"])
+	if record["logId"] != "bd24e7ad-2e41-4638-b129-c1dd7e125faa" {
+		t.Errorf("Expected traceId 'bd24e7ad-2e41-4638-b129-c1dd7e125faa', got '%v'", record["logId"])
 	}
-	if record["action"] != "TEST_ACTION" {
-		t.Errorf("Expected action 'TEST_ACTION', got '%v'", record["action"])
+	if record["requestType"] != "HTTP" {
+		t.Errorf("Expected action 'HTTP', got '%v'", record["requestType"])
 	}
 	if record["context"] != "TestContext" {
 		t.Errorf("Expected context 'TestContext', got '%v'", record["context"])
@@ -72,15 +72,15 @@ func TestLogWithRequestResponse(t *testing.T) {
 	mockDriver := NewMockDriver()
 	log.SetDriver(mockDriver)
 
-	id, err := log.Log(&LogOptions{
-		TraceID:      "test-trace-002",
-		Action:       "API_CALL",
-		Method:       "POST",
-		Path:         "/api/test",
-		RequestBody:  map[string]interface{}{"key": "value"},
-		StatusCode:   200,
-		ResponseBody: map[string]interface{}{"result": "success"},
-		DurationMs:   123.45,
+	id, err := log.SendTraceByLog(&TraceLogOptions{
+		LogID:              "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		RequestType:        "HTTP",
+		Endpoint:           "/edd/fee2/facade/pdp",
+		ServiceName:        "my-service",
+		RequestMethod:      "GET",
+		RequestBody:        map[string]interface{}{},
+		ResponseStatusCode: 200,
+		ResponseBody:       map[string]interface{}{"success": true},
 	})
 
 	if err != nil {
@@ -92,16 +92,13 @@ func TestLogWithRequestResponse(t *testing.T) {
 	}
 
 	record := mockDriver.records[0]
-	
+
 	request, ok := record["request"].(map[string]interface{})
 	if !ok {
 		t.Fatal("Expected request to be a map")
 	}
-	if request["method"] != "POST" {
-		t.Errorf("Expected method 'POST', got '%v'", request["method"])
-	}
-	if request["path"] != "/api/test" {
-		t.Errorf("Expected path '/api/test', got '%v'", request["path"])
+	if request["method"] != "GET" {
+		t.Errorf("Expected method 'GET', got '%v'", request["method"])
 	}
 
 	response, ok := record["response"].(map[string]interface{})
@@ -111,10 +108,6 @@ func TestLogWithRequestResponse(t *testing.T) {
 	if response["statusCode"] != float64(200) {
 		t.Errorf("Expected statusCode 200, got '%v'", response["statusCode"])
 	}
-
-	if record["durationMs"] != 123.45 {
-		t.Errorf("Expected durationMs 123.45, got '%v'", record["durationMs"])
-	}
 }
 
 func TestLogWithTags(t *testing.T) {
@@ -122,11 +115,11 @@ func TestLogWithTags(t *testing.T) {
 	mockDriver := NewMockDriver()
 	log.SetDriver(mockDriver)
 
-	tags := []string{"tag1", "tag2", "tag3"}
-	_, err := log.Log(&LogOptions{
-		TraceID: "test-trace-003",
-		Action:  "TAGGED_ACTION",
-		Tags:    tags,
+	tags := []string{"http", "middleware", "request-response"}
+	_, err := log.SendTraceByLog(&TraceLogOptions{
+		LogID:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		RequestType: "HTTP",
+		Tags:        tags,
 	})
 
 	if err != nil {
@@ -149,9 +142,9 @@ func TestLogDefaultLevel(t *testing.T) {
 	mockDriver := NewMockDriver()
 	log.SetDriver(mockDriver)
 
-	_, err := log.Log(&LogOptions{
-		TraceID: "test-trace-004",
-		Action:  "DEFAULT_LEVEL",
+	_, err := log.SendTraceByLog(&TraceLogOptions{
+		LogID: "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		Level: "INFO",
 	})
 
 	if err != nil {
@@ -169,10 +162,9 @@ func TestLogCustomLevel(t *testing.T) {
 	mockDriver := NewMockDriver()
 	log.SetDriver(mockDriver)
 
-	_, err := log.Log(&LogOptions{
-		TraceID: "test-trace-005",
-		Action:  "ERROR_ACTION",
-		Level:   "ERROR",
+	_, err := log.SendTraceByLog(&TraceLogOptions{
+		LogID: "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		Level: "ERROR",
 	})
 
 	if err != nil {
@@ -190,8 +182,8 @@ func TestConsoleDriver(t *testing.T) {
 	defer driver.Close()
 
 	record := map[string]interface{}{
-		"traceId": "console-test",
-		"action":  "CONSOLE_TEST",
+		"LogID":    "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		"Endpoint": "/edd/fee2/facade/pdp",
 	}
 
 	id, err := driver.Send(record)
@@ -203,3 +195,20 @@ func TestConsoleDriver(t *testing.T) {
 		t.Errorf("Expected id 'console-log', got '%s'", id)
 	}
 }
+
+// Testing
+//❯ GOCACHE=$(pwd)/.gocache go test -run TestLog -v
+//=== RUN   TestLogWithMockDriver
+//--- PASS: TestLogWithMockDriver (0.00s)
+//=== RUN   TestLogWithRequestResponse
+//--- PASS: TestLogWithRequestResponse (0.00s)
+//=== RUN   TestLogWithTags
+//--- PASS: TestLogWithTags (0.00s)
+//=== RUN   TestLogDefaultLevel
+//--- PASS: TestLogDefaultLevel (0.00s)
+//=== RUN   TestLogCustomLevel
+//--- PASS: TestLogCustomLevel (0.00s)
+//PASS
+//ok      github.com/icastillogomar/digital-logger-edd-golang     0.803s
+//
+//GOCACHE=$(pwd)/.gocache go test -run TestLogWithMockDriver -v
