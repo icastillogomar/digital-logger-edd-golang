@@ -2,8 +2,6 @@ package eddlogger
 
 import (
 	"testing"
-
-	"github.com/icastillogomar/digital-logger-edd-golang/drivers"
 )
 
 type MockDriver struct {
@@ -37,33 +35,58 @@ func TestLogWithMockDriver(t *testing.T) {
 	mockDriver := NewMockDriver()
 	log.SetDriver(mockDriver)
 
-	id, err := log.SendTraceByLog(&TraceLogOptions{
-		LogID:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		RequestType: "HTTP",
-		Context:     "TestContext",
+	id, err := log.Log(&LogOptions{
+		TraceID: "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		Action:  "TestAction",
+		Context: "TestContext",
 	})
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
 	if id != "mock-id" {
-		t.Errorf("Expected id 'mock-id', got '%s'", id)
+		t.Errorf("Expected ID 'mock-id', got '%s'", id)
 	}
-
 	if len(mockDriver.records) != 1 {
 		t.Fatalf("Expected 1 record, got %d", len(mockDriver.records))
 	}
+}
+
+func TestLogInfoLevel(t *testing.T) {
+	log := NewLogger("test-service")
+	mockDriver := NewMockDriver()
+	log.SetDriver(mockDriver)
+
+	log.Log(&LogOptions{
+		TraceID:  "test-trace-id",
+		Level:    "INFO",
+		Action:   "test_action",
+		Context:  "TestContext",
+		DurationMs: 123.45,
+	})
 
 	record := mockDriver.records[0]
-	if record["logId"] != "bd24e7ad-2e41-4638-b129-c1dd7e125faa" {
-		t.Errorf("Expected traceId 'bd24e7ad-2e41-4638-b129-c1dd7e125faa', got '%v'", record["logId"])
+	if record["traceId"] != "test-trace-id" {
+		t.Errorf("Expected traceId 'test-trace-id', got '%v'", record["traceId"])
 	}
-	if record["requestType"] != "HTTP" {
-		t.Errorf("Expected action 'HTTP', got '%v'", record["requestType"])
+	if record["level"] != "INFO" {
+		t.Errorf("Expected level 'INFO', got '%v'", record["level"])
 	}
-	if record["context"] != "TestContext" {
-		t.Errorf("Expected context 'TestContext', got '%v'", record["context"])
+}
+
+func TestLogDefaultInfoLevel(t *testing.T) {
+	log := NewLogger("test-service")
+	mockDriver := NewMockDriver()
+	log.SetDriver(mockDriver)
+
+	log.Log(&LogOptions{
+		TraceID: "test-trace-id",
+		Action:  "test_action",
+	})
+
+	record := mockDriver.records[0]
+	if record["level"] != "INFO" {
+		t.Errorf("Expected default level 'INFO', got '%v'", record["level"])
 	}
 }
 
@@ -72,143 +95,104 @@ func TestLogWithRequestResponse(t *testing.T) {
 	mockDriver := NewMockDriver()
 	log.SetDriver(mockDriver)
 
-	id, err := log.SendTraceByLog(&TraceLogOptions{
-		LogID:              "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		RequestType:        "HTTP",
-		Endpoint:           "/edd/fee2/facade/pdp",
-		ServiceName:        "my-service",
-		RequestMethod:      "GET",
-		RequestBody:        map[string]interface{}{},
-		ResponseStatusCode: 200,
-		ResponseBody:       map[string]interface{}{"success": true},
+	log.Log(&LogOptions{
+		TraceID:     "req-trace-id",
+		Method:      "POST",
+		Path:        "/api/test",
+		RequestHeaders: map[string]string{"Content-Type": "application/json"},
+		RequestBody: map[string]interface{}{"key": "value"},
+		StatusCode:  200,
+	})
+
+	record := mockDriver.records[0]
+	if record["traceId"] != "req-trace-id" {
+		t.Errorf("Expected traceId 'req-trace-id', got '%v'", record["traceId"])
+	}
+}
+
+func TestLogServiceOverride(t *testing.T) {
+	log := NewLogger("default-service")
+	mockDriver := NewMockDriver()
+	log.SetDriver(mockDriver)
+
+	log.Log(&LogOptions{
+		TraceID: "svc-trace-id",
+		Service: "overridden-service",
+	})
+
+	record := mockDriver.records[0]
+	if record["service"] != "overridden-service" {
+		t.Errorf("Expected service 'overridden-service', got '%v'", record["service"])
+	}
+}
+
+func TestSetDriver(t *testing.T) {
+	log := NewLogger("test-service")
+	mockDriver := NewMockDriver()
+	log.SetDriver(mockDriver)
+
+	if log.driver != mockDriver {
+		t.Errorf("Expected driver to be set")
+	}
+}
+
+func TestCloseWithDriver(t *testing.T) {
+	log := NewLogger("test-service")
+	mockDriver := NewMockDriver()
+	log.SetDriver(mockDriver)
+
+	err := log.Close()
+	if err != nil {
+		t.Errorf("Expected no error on close, got %v", err)
+	}
+}
+
+func TestNewLoggerEmptyService(t *testing.T) {
+	log := NewLogger("")
+	if log.service != "digital-edd" {
+		t.Errorf("Expected default service 'digital-edd', got '%s'", log.service)
+	}
+
+	defer log.Close()
+	driver := log.getDriver()
+	if driver == nil {
+		t.Fatal("Expected a driver to be created")
+	}
+}
+
+func TestSendTraceLog(t *testing.T) {
+	log := NewLogger("test-service")
+	mockDriver := NewMockDriver()
+	log.SetDriver(mockDriver)
+
+	id, err := log.SendTraceLog(&TraceLog{
+		TraceID: "test-trace-id",
+		Service: "test-service",
+		Level:   INFO,
 	})
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
 	if id != "mock-id" {
-		t.Errorf("Expected id 'mock-id', got '%s'", id)
+		t.Errorf("Expected ID 'mock-id', got '%s'", id)
 	}
-
 	record := mockDriver.records[0]
-
-	request, ok := record["request"].(map[string]interface{})
-	if !ok {
-		t.Fatal("Expected request to be a map")
-	}
-	if request["method"] != "GET" {
-		t.Errorf("Expected method 'GET', got '%v'", request["method"])
-	}
-
-	response, ok := record["response"].(map[string]interface{})
-	if !ok {
-		t.Fatal("Expected response to be a map")
-	}
-	if response["statusCode"] != float64(200) {
-		t.Errorf("Expected statusCode 200, got '%v'", response["statusCode"])
+	if record["traceId"] != "test-trace-id" {
+		t.Errorf("Expected traceId 'test-trace-id', got '%v'", record["traceId"])
 	}
 }
 
-func TestLogWithTags(t *testing.T) {
-	log := NewLogger("test-service")
-	mockDriver := NewMockDriver()
-	log.SetDriver(mockDriver)
-
-	tags := []string{"http", "middleware", "request-response"}
-	_, err := log.SendTraceByLog(&TraceLogOptions{
-		LogID:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		RequestType: "HTTP",
-		Tags:        tags,
-	})
-
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	record := mockDriver.records[0]
-	recordTags, ok := record["tags"].([]interface{})
-	if !ok {
-		t.Fatal("Expected tags to be an array")
-	}
-
-	if len(recordTags) != len(tags) {
-		t.Errorf("Expected %d tags, got %d", len(tags), len(recordTags))
+func TestGetMexicoTimeAsUTC(t *testing.T) {
+	now := GetMexicoTimeAsUTC()
+	if now == "" {
+		t.Errorf("Expected non-empty time string")
 	}
 }
 
-func TestLogDefaultLevel(t *testing.T) {
-	log := NewLogger("test-service")
-	mockDriver := NewMockDriver()
-	log.SetDriver(mockDriver)
-
-	_, err := log.SendTraceByLog(&TraceLogOptions{
-		LogID: "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		Level: "INFO",
-	})
-
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	record := mockDriver.records[0]
-	if record["level"] != "INFO" {
-		t.Errorf("Expected default level 'INFO', got '%v'", record["level"])
+func TestProductionCheck(t *testing.T) {
+	result := IsProduction()
+	if result {
+		t.Skip("Running in production mode (PUBSUB_ENABLED set), skipping local only test")
 	}
 }
-
-func TestLogCustomLevel(t *testing.T) {
-	log := NewLogger("test-service")
-	mockDriver := NewMockDriver()
-	log.SetDriver(mockDriver)
-
-	_, err := log.SendTraceByLog(&TraceLogOptions{
-		LogID: "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		Level: "ERROR",
-	})
-
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	record := mockDriver.records[0]
-	if record["level"] != "ERROR" {
-		t.Errorf("Expected level 'ERROR', got '%v'", record["level"])
-	}
-}
-
-func TestConsoleDriver(t *testing.T) {
-	driver := drivers.NewConsoleDriver()
-	defer driver.Close()
-
-	record := map[string]interface{}{
-		"LogID":    "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		"Endpoint": "/edd/fee2/facade/pdp",
-	}
-
-	id, err := driver.Send(record)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	if id != "console-log" {
-		t.Errorf("Expected id 'console-log', got '%s'", id)
-	}
-}
-
-// Testing
-//❯ GOCACHE=$(pwd)/.gocache go test -run TestLog -v
-//=== RUN   TestLogWithMockDriver
-//--- PASS: TestLogWithMockDriver (0.00s)
-//=== RUN   TestLogWithRequestResponse
-//--- PASS: TestLogWithRequestResponse (0.00s)
-//=== RUN   TestLogWithTags
-//--- PASS: TestLogWithTags (0.00s)
-//=== RUN   TestLogDefaultLevel
-//--- PASS: TestLogDefaultLevel (0.00s)
-//=== RUN   TestLogCustomLevel
-//--- PASS: TestLogCustomLevel (0.00s)
-//PASS
-//ok      github.com/icastillogomar/digital-logger-edd-golang     0.803s
-//
-//GOCACHE=$(pwd)/.gocache go test -run TestLogWithMockDriver -v

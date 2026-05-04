@@ -2,6 +2,7 @@ package eddlogger
 
 import (
 	"encoding/json"
+	"sync"
 
 	"github.com/icastillogomar/digital-logger-edd-golang/drivers"
 )
@@ -28,82 +29,6 @@ type LogOptions struct {
 	DurationMs      float64
 	Tags            []string
 	Service         string
-}
-
-type TraceInputOptions struct {
-	RequestID                    string
-	RequestType                  string
-	Endpoint                     string
-	ReceivedAt                   string
-	EnterpriseCode               string
-	Cp                           string
-	Channel                      string
-	EddLineSKU                   string
-	EddLineQuantity              int
-	EddLineProductType           string
-	RecalculateLineSKU           string
-	RecalculateLineQuantity      *int
-	RecalculateLinePurchaseDate  string
-	RecalculateLineDeliveryDate  string
-	RecalculateLineStoreRejected string
-	RecalculateLineCarrierReject string
-	LineCount                    *int
-	Tags                         []string
-	AdditionalData               interface{}
-	IngestedAt                   string
-}
-
-type TraceOutputOptions struct {
-	RequestID                  string
-	RequestType                string
-	Endpoint                   string
-	RespondedAt                string
-	HTTPStatusCode             int
-	StatusFamily               *int
-	IsError                    *bool
-	MetadataIDTxn              string
-	MetadataProcessingTimeMs   *int
-	MetadataIngestedAt         string
-	MetadataRecalculateOrder   string
-	AlgorithmModelState        string
-	AlgorithmWeightsInventory  *float64
-	AlgorithmWeightsLeadTime   *float64
-	AlgorithmWeightsCost       *float64
-	AlgorithmWeightsNode       *float64
-	AlgorithmWeightsPath       *float64
-	AlgorithmWeightsDifference *float64
-	AlgorithmWeightsSplits     *float64
-	EddCalculated              *EddCalculated
-	StoreIDs                   []int
-	ErrorCode                  string
-	ErrorMessage               string
-	Tags                       []string
-	AdditionalData             interface{}
-	IngestedAt                 string
-}
-
-type TraceLogOptions struct {
-	LogID              string
-	RequestID          string
-	RequestType        string
-	Endpoint           string
-	LogAt              string
-	Level              string
-	Context            string
-	Message            string
-	Step               string
-	DurationMs         *float64
-	IDTxn              string
-	Tags               []string
-	AdditionalData     interface{}
-	Extra              interface{}
-	Stacktrace         string
-	IngestedAt         string
-	ServiceName        string
-	RequestMethod      string
-	RequestBody        interface{}
-	ResponseStatusCode int
-	ResponseBody       interface{}
 }
 
 func NewLogger(service string) *EddLogger {
@@ -196,6 +121,7 @@ func (l *EddLogger) Log(opts *LogOptions) (string, error) {
 	}
 
 	trace := &TraceLog{
+		TypeStream:  "sdkHisStream",
 		TraceID:     opts.TraceID,
 		Timestamp:   GetMexicoTimeAsUTC(),
 		Service:     service,
@@ -219,8 +145,6 @@ func (l *EddLogger) Close() error {
 	return nil
 }
 
-// TODO: Mar9,2026 nuevas funciones para los schema de fee2 sdk
-
 func (l *EddLogger) sendTraceAll(trace interface{}) (string, error) {
 	data, err := json.Marshal(trace)
 	if err != nil {
@@ -235,216 +159,186 @@ func (l *EddLogger) sendTraceAll(trace interface{}) (string, error) {
 	return l.getDriver().Send(record)
 }
 
-// SendTraceByInput is kept for backward compatibility and delegates to SendTraceAll.
-func (l *EddLogger) SendTraceByInput(opts *TraceInputOptions) (string, error) {
-	if opts == nil {
-		opts = &TraceInputOptions{}
-	}
+// SDKTrnOptions collects detail-level data from the ms-facade algorithm pipeline.
+// One Add() call = one SKU winner route. Writes to LGS_EDD_SDK_TRN.
+type SDKTrnOptions struct {
+	RequestType string
+	Endpoint    string
 
-	var eddLine *EddLine
-	if opts.EddLineSKU != "" || opts.EddLineQuantity != 0 || opts.EddLineProductType != "" {
-		eddLine = &EddLine{
-			SKU:         opts.EddLineSKU,
-			Quantity:    opts.EddLineQuantity,
-			ProductType: opts.EddLineProductType,
-		}
-	}
+	CP              string
+	Channel         string
+	EnterpriseCode  string
+	SKU             string
+	Quantity        int
+	ProductType     string
+	FulfillmentType string
 
-	var recalculateLine *RecalculateLine
-	if opts.RecalculateLineSKU != "" ||
-		opts.RecalculateLineQuantity != nil ||
-		opts.RecalculateLinePurchaseDate != "" ||
-		opts.RecalculateLineDeliveryDate != "" ||
-		opts.RecalculateLineStoreRejected != "" ||
-		opts.RecalculateLineCarrierReject != "" {
-		recalculateLine = &RecalculateLine{
-			SKU:              opts.RecalculateLineSKU,
-			Quantity:         opts.RecalculateLineQuantity,
-			PurchaseDateEdd1: opts.RecalculateLinePurchaseDate,
-			DeliveryDateEdd2: opts.RecalculateLineDeliveryDate,
-		}
-		if opts.RecalculateLineStoreRejected != "" {
-			recalculateLine.StoreRejected = &opts.RecalculateLineStoreRejected
-		}
-		if opts.RecalculateLineCarrierReject != "" {
-			recalculateLine.CarrierRejected = &opts.RecalculateLineCarrierReject
-		}
-	}
+	PurchaseDateEdd1 string
+	DeliveryDateEdd2 string
+	StoreRejected    string
 
-	trace := &TraceByInput{
-		TypeStream:       "inputStream",
-		RequestID:        opts.RequestID,
-		RequestType:      opts.RequestType,
-		Endpoint:         opts.Endpoint,
-		ReceivedAt:       opts.ReceivedAt,
-		EnterpriseCode:   opts.EnterpriseCode,
-		Cp:               opts.Cp,
-		Channel:          opts.Channel,
-		EddLines:         eddLine,
-		RecalculateLines: recalculateLine,
-		LineCount:        opts.LineCount,
-		Tags:             opts.Tags,
-		AdditionalData:   opts.AdditionalData,
-		IngestedAt:       opts.IngestedAt,
-	}
-	return l.sendTraceAll(trace)
+	OrderNumber string
+	EmittedAt   string
+
+	DeliveryDate   string
+	DeliveryMethod string
+	Route          string
+	StoreID        string
+	StoreName      string
+	TimeDays       int
+	Cost           float64
+
+	OhLimit        int
+	OhInventory    int
+	StoreCapacity  float64
+	StoreInventory int
+	SkusSent       int
+
+	IsRecalculated bool
+
+	InventoryWeight float64
+	TimeWeight      float64
+	CostWeight      float64
+	NodeWeight      float64
+	Season          string
+	Score           float64
+
+	CalculatedAt    string
+	ExecutionTimeMs float64
+
+	ServiceName string
 }
 
-// SendTraceByOutput is kept for backward compatibility and delegates to SendTraceAll.
-func (l *EddLogger) SendTraceByOutput(opts *TraceOutputOptions) (string, error) {
-	if opts == nil {
-		opts = &TraceOutputOptions{}
-	}
-
-	var metadata *OutputMetadata
-	if opts.MetadataIDTxn != "" ||
-		opts.MetadataProcessingTimeMs != nil ||
-		opts.MetadataIngestedAt != "" ||
-		opts.MetadataRecalculateOrder != "" {
-		metadata = &OutputMetadata{
-			ProcessingTimeMs: opts.MetadataProcessingTimeMs,
-		}
-		if opts.MetadataIDTxn != "" {
-			metadata.IDTxn = &opts.MetadataIDTxn
-		}
-		if opts.MetadataIngestedAt != "" {
-			metadata.IngestedAt = &opts.MetadataIngestedAt
-		}
-		if opts.MetadataRecalculateOrder != "" {
-			metadata.RecalculateOrder = &opts.MetadataRecalculateOrder
-		}
-	}
-
-	var algorithmModelState *string
-	if opts.AlgorithmModelState != "" {
-		algorithmModelState = &opts.AlgorithmModelState
-	}
-
-	var algorithmWeights *AlgorithmWeights
-	if opts.AlgorithmWeightsInventory != nil ||
-		opts.AlgorithmWeightsLeadTime != nil ||
-		opts.AlgorithmWeightsCost != nil ||
-		opts.AlgorithmWeightsNode != nil ||
-		opts.AlgorithmWeightsPath != nil ||
-		opts.AlgorithmWeightsDifference != nil ||
-		opts.AlgorithmWeightsSplits != nil {
-		algorithmWeights = &AlgorithmWeights{
-			Inventory:  opts.AlgorithmWeightsInventory,
-			LeadTime:   opts.AlgorithmWeightsLeadTime,
-			Cost:       opts.AlgorithmWeightsCost,
-			Node:       opts.AlgorithmWeightsNode,
-			Path:       opts.AlgorithmWeightsPath,
-			Difference: opts.AlgorithmWeightsDifference,
-			Splits:     opts.AlgorithmWeightsSplits,
-		}
-	}
-
-	var errorCode *string
-	if opts.ErrorCode != "" {
-		errorCode = &opts.ErrorCode
-	}
-
-	var errorMessage *string
-	if opts.ErrorMessage != "" {
-		errorMessage = &opts.ErrorMessage
-	}
-
-	trace := &TraceByOutput{
-		TypeStream:          "outputStream",
-		RequestID:           opts.RequestID,
-		RequestType:         opts.RequestType,
-		Endpoint:            opts.Endpoint,
-		RespondedAt:         opts.RespondedAt,
-		HTTPStatusCode:      opts.HTTPStatusCode,
-		StatusFamily:        opts.StatusFamily,
-		IsError:             opts.IsError,
-		Metadata:            metadata,
-		AlgorithmModelState: algorithmModelState,
-		AlgorithmWeights:    algorithmWeights,
-		EddCalculated:       opts.EddCalculated,
-		StoreIDs:            opts.StoreIDs,
-		ErrorCode:           errorCode,
-		ErrorMessage:        errorMessage,
-		Tags:                opts.Tags,
-		AdditionalData:      opts.AdditionalData,
-		IngestedAt:          opts.IngestedAt,
-	}
-	return l.sendTraceAll(trace)
+// SDKTrnCollector accumulates SDK_TRN rows during the ms-facade algorithm lifecycle.
+// One Add() call = one winner route for one SKU. Call Save() once at the end.
+// Safe for concurrent use.
+type SDKTrnCollector struct {
+	mu          sync.Mutex
+	logger      *EddLogger
+	routes      []TraceSDKTrn
+	requestID   string
+	serviceName string
+	startedAt   string
+	saved       bool
 }
 
-// SendTraceByLog is kept for backward compatibility and delegates to SendTraceAll.
-func (l *EddLogger) SendTraceByLog(opts *TraceLogOptions) (string, error) {
+// NewSDKTrnCollector creates a collector bound to a single request lifecycle.
+func (l *EddLogger) NewSDKTrnCollector(requestID string) *SDKTrnCollector {
+	return &SDKTrnCollector{
+		logger:    l,
+		requestID: requestID,
+		startedAt: GetMexicoTimeAsUTC(),
+	}
+}
+
+// Add appends the winner route for one SKU. Thread-safe.
+func (rc *SDKTrnCollector) Add(opts *SDKTrnOptions) {
 	if opts == nil {
-		opts = &TraceLogOptions{}
+		return
 	}
 
-	var level *string
-	if opts.Level != "" {
-		level = &opts.Level
+	serviceName := opts.ServiceName
+	if serviceName == "" {
+		serviceName = rc.logger.service
 	}
 
-	var context *string
-	if opts.Context != "" {
-		context = &opts.Context
+	rc.mu.Lock()
+	if rc.serviceName == "" {
+		rc.serviceName = serviceName
+	}
+	rc.mu.Unlock()
+
+	now := GetMexicoTimeAsUTC()
+
+	trace := TraceSDKTrn{
+		TypeStream: "sdkTrnStream",
+
+		RequestID:   rc.requestID,
+		RequestType: opts.RequestType,
+		Endpoint:    opts.Endpoint,
+
+		CP:              opts.CP,
+		Channel:         opts.Channel,
+		EnterpriseCode:  opts.EnterpriseCode,
+		SKU:             opts.SKU,
+		Quantity:        opts.Quantity,
+		ProductType:     opts.ProductType,
+		FulfillmentType: opts.FulfillmentType,
+
+		PurchaseDateEdd1: opts.PurchaseDateEdd1,
+		DeliveryDateEdd2: opts.DeliveryDateEdd2,
+		StoreRejected:    opts.StoreRejected,
+
+		OrderNumber: opts.OrderNumber,
+		EmittedAt:   opts.EmittedAt,
+
+		DeliveryDate:   opts.DeliveryDate,
+		DeliveryMethod: opts.DeliveryMethod,
+		Route:          opts.Route,
+		StoreID:        opts.StoreID,
+		StoreName:      opts.StoreName,
+		TimeDays:       opts.TimeDays,
+		Cost:           opts.Cost,
+
+		OhLimit:        opts.OhLimit,
+		OhInventory:    opts.OhInventory,
+		StoreCapacity:  opts.StoreCapacity,
+		Winner:         true,
+		StoreInventory: opts.StoreInventory,
+		SkusSent:       opts.SkusSent,
+
+		IsRecalculated: opts.IsRecalculated,
+
+		InventoryWeight: opts.InventoryWeight,
+		TimeWeight:      opts.TimeWeight,
+		CostWeight:      opts.CostWeight,
+		NodeWeight:      opts.NodeWeight,
+		Season:          opts.Season,
+		Score:           opts.Score,
+
+		CalculatedAt:    opts.CalculatedAt,
+		ExecutionTimeMs: opts.ExecutionTimeMs,
+
+		IngestedAt:  now,
+		ServiceName: rc.serviceName,
 	}
 
-	var message *string
-	if opts.Message != "" {
-		message = &opts.Message
-	}
+	rc.mu.Lock()
+	rc.routes = append(rc.routes, trace)
+	rc.mu.Unlock()
+}
 
-	var step *string
-	if opts.Step != "" {
-		step = &opts.Step
+// Save flushes all collected records through the configured driver. Idempotent.
+func (rc *SDKTrnCollector) Save() (int, error) {
+	rc.mu.Lock()
+	if rc.saved {
+		rc.mu.Unlock()
+		return 0, nil
 	}
+	rc.saved = true
+	routes := rc.routes
+	rc.mu.Unlock()
 
-	var stacktrace *string
-	if opts.Stacktrace != "" {
-		stacktrace = &opts.Stacktrace
-	}
-
-	var serviceName *string
-	if opts.ServiceName != "" {
-		serviceName = &opts.ServiceName
-	}
-
-	var request *LogRequestPayload
-	if opts.RequestMethod != "" || opts.RequestBody != nil {
-		request = &LogRequestPayload{
-			Method: opts.RequestMethod,
-			Body:   opts.RequestBody,
+	var lastErr error
+	for i := range routes {
+		if _, err := rc.logger.sendTraceAll(&routes[i]); err != nil {
+			lastErr = err
 		}
 	}
+	return len(routes), lastErr
+}
 
-	var response *LogResponsePayload
-	if opts.ResponseStatusCode != 0 || opts.ResponseBody != nil {
-		response = &LogResponsePayload{
-			StatusCode: opts.ResponseStatusCode,
-			Body:       opts.ResponseBody,
-		}
-	}
+// Len returns the number of routes collected so far.
+func (rc *SDKTrnCollector) Len() int {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	return len(rc.routes)
+}
 
-	trace := &TraceByLog{
-		TypeStream:     "logsStream",
-		LogID:          opts.LogID,
-		RequestID:      opts.RequestID,
-		RequestType:    opts.RequestType,
-		Endpoint:       opts.Endpoint,
-		LogAt:          opts.LogAt,
-		Level:          level,
-		Context:        context,
-		Message:        message,
-		Step:           step,
-		DurationMs:     opts.DurationMs,
-		IDTxn:          opts.IDTxn,
-		Tags:           opts.Tags,
-		AdditionalData: opts.AdditionalData,
-		Extra:          opts.Extra,
-		Stacktrace:     stacktrace,
-		IngestedAt:     opts.IngestedAt,
-		ServiceName:    serviceName,
-		Request:        request,
-		Response:       response,
-	}
-	return l.sendTraceAll(trace)
+// Deprecated aliases for backward compatibility.
+type TraceRouteOptions = SDKTrnOptions
+type RouteCollector = SDKTrnCollector
+
+func (l *EddLogger) NewRouteCollector(requestID string) *SDKTrnCollector {
+	return l.NewSDKTrnCollector(requestID)
 }
