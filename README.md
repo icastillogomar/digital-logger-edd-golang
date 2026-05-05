@@ -21,32 +21,21 @@ func main() {
 	traceLogger := eddlogger.NewLogger("my-service")
     defer traceLogger.Close()
 
-	traceLogger.SendTraceByLog(&eddlogger.TraceLogOptions{
-		LogID:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		RequestID:   "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		RequestType: "HTTP",
-		Endpoint:    "/edd/fee2/facade/pdp",
-		LogAt:       "2026-03-10 11:24:37.079000 UTC",
-		Level:       "INFO",
-		Context:     "middleware.request_response",
-		Message:     "HTTP request/response trace",
-		Step:        "RequestResponseLogger",
-		IDTxn:       "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
-		Tags:        []string{"http", "middleware", "request-response"},
-		AdditionalData: map[string]interface{}{
-			"path":  "/edd/fee2/facade/pdp",
-			"query": "quantity=1&skuId=1001330922&productType=Soft%20Line&postalCode=01040",
-		},
-		Extra: map[string]interface{}{
-			"clientIp":  "201.116.168.4",
-			"userAgent": "PostmanRuntime/7.52.0",
-		},
-		IngestedAt:         "2026-03-10 11:24:37.079000 UTC",
-		ServiceName:        "my-service",
-		RequestMethod:      "GET",
-		RequestBody:        map[string]interface{}{},
-		ResponseStatusCode: 200,
-		ResponseBody:       map[string]interface{}{"success":true},
+	traceLogger.Log(&eddlogger.LogOptions{
+		TraceID: "bd24e7ad-2e41-4638-b129-c1dd7e125faa",
+		Level: "INFO",
+		Action: "",
+		Context: "middleware.request_response",
+		Method: "HTTP",
+		Path: "/edd/fee2/facade/sbb",
+		RequestBody: map[string]interface{}{},
+		StatusCode: 200,
+		ResponseBody: map[string]interface{}{"success":true},
+		MessageInfo: "",
+		MessageRaw: "",
+		DurationMs: 0,
+		Tags: []string{"http", "middleware", "request-response"},
+		Service: "my-service",
     })
 }
 ```
