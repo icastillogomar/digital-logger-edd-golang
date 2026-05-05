@@ -65,34 +65,6 @@ GOOGLE_CLOUD_PROJECT=my-project-id
 
 Si falta configuración, usa `ConsoleDriver` como fallback.
 
-## API
-
-```go
-type TraceLogOptions struct {
-    LogID              string
-    RequestID          string
-    RequestType        string
-    Endpoint           string
-    LogAt              string
-    Level              string    // DEBUG, INFO, WARNING, ERROR, CRITICAL
-    Context            string
-    Message            string
-    Step               string
-    DurationMs         *float64
-    IDTxn              string
-    Tags               []string
-    AdditionalData     interface{}
-    Extra              interface{}
-    Stacktrace         string
-    IngestedAt         string
-    ServiceName        string
-    RequestMethod      string
-    RequestBody        interface{}
-    ResponseStatusCode int
-    ResponseBody       interface{}
-}
-```
-
 ## Variables de Entorno
 
 | Variable               | Descripción                    | Requerido                             |
